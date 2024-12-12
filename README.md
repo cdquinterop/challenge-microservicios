@@ -8,7 +8,7 @@ Este proyecto implementa dos microservicios independientes: uno para la gestión
 ## Requisitos Previos
 
 ### Tecnologías necesarias
-- **Java 17** o superior.
+- **Java 17**.
 - **Maven** para la gestión de dependencias.
 - **RabbitMQ** como sistema de mensajería.
 - **Postman** para probar los endpoints.
