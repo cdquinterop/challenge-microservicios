@@ -41,8 +41,14 @@ public class ClienteServiceImpl implements ClienteService {
 
     @Override
     public ClienteResponseDTO create(ClienteRequestDTO clienteRequestDTO) {
+        // Validación del nombre
+        if (clienteRequestDTO.getNombre() == null || clienteRequestDTO.getNombre().trim().isEmpty()) {
+            throw new IllegalArgumentException(ClienteServiceException.CLIENTE_NAME_EMPTY);
+        }
+
+        // Validación de identificación duplicada
         if (clienteRepository.findByIdentificacion(clienteRequestDTO.getIdentificacion()).isPresent()) {
-            throw new ClienteServiceException("Cliente ya registrado con la identificación: " + clienteRequestDTO.getIdentificacion());
+            throw new ClienteServiceException(ClienteServiceException.CLIENTE_ALREADY_REGISTERED + clienteRequestDTO.getIdentificacion());
         }
 
         Cliente cliente = modelMapper.map(clienteRequestDTO, Cliente.class);
@@ -53,7 +59,7 @@ public class ClienteServiceImpl implements ClienteService {
             publishClienteEvent("CREATE", savedCliente);
             return modelMapper.map(savedCliente, ClienteResponseDTO.class);
         } catch (Exception e) {
-            throw new ClienteServiceException(ClienteServiceException.CLIENTE_CREATION_ERROR, e);
+            throw new RuntimeException("Error al guardar en la base de datos", e);
         }
     }
 

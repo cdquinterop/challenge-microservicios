@@ -28,7 +28,6 @@ public class CuentaController {
 
     @PostMapping
     public ResponseEntity<CuentaResponseDTO> createCuenta(@RequestBody CuentaRequestDTO cuentaRequestDTO) {
-        System.out.println("Ingrese al crear cuenta");
         return ResponseEntity.ok(cuentaService.create(cuentaRequestDTO));
     }
 
