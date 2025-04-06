@@ -1,14 +1,14 @@
 package com.example.personaservice.dto.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.io.Serializable;
 
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString
 public class ClienteResponseDTO implements Serializable {
     private Long clienteId;
     private String nombre;

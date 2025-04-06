@@ -1,16 +1,19 @@
 package com.example.cuentaservice.dto.response;
 
-import lombok.Data;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString
 public class MovimientoResponseDTO {
-    private Long id;
+    private Long movimientoId;
     private String numeroCuenta;
     private LocalDateTime fecha;
     private String tipoMovimiento;
     private Double valor;
     private Double saldo;
-
 }

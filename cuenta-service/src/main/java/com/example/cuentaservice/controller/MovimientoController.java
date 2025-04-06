@@ -3,10 +3,13 @@ package com.example.cuentaservice.controller;
 import com.example.cuentaservice.dto.request.MovimientoRequestDTO;
 import com.example.cuentaservice.dto.response.MovimientoResponseDTO;
 import com.example.cuentaservice.service.MovimientoService;
+import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -16,21 +19,29 @@ public class MovimientoController {
 
     private final MovimientoService movimientoService;
 
+    @Operation(summary = "Listar todos los movimientos")
     @GetMapping
     public ResponseEntity<List<MovimientoResponseDTO>> getAllMovimientos() {
         return ResponseEntity.ok(movimientoService.findAll());
     }
 
+    @Operation(summary = "Crear un nuevo movimiento")
     @PostMapping
-    public ResponseEntity<MovimientoResponseDTO> createMovimiento(@RequestBody MovimientoRequestDTO movimientoRequestDTO) {
-        return ResponseEntity.ok(movimientoService.create(movimientoRequestDTO));
+    public ResponseEntity<MovimientoResponseDTO> createMovimiento(@Valid @RequestBody MovimientoRequestDTO movimientoRequestDTO) {
+        MovimientoResponseDTO movimiento = movimientoService.create(movimientoRequestDTO);
+        return ResponseEntity
+                .created(URI.create("/api/movimientos/" + movimiento.getMovimientoId()))
+                .body(movimiento);
     }
+
+    @Operation(summary = "Actualizar un movimiento")
     @PutMapping("/{id}")
-    public ResponseEntity<MovimientoResponseDTO> updateMovimiento(@PathVariable Long id, @RequestBody MovimientoRequestDTO movimientoRequestDTO) {
+    public ResponseEntity<MovimientoResponseDTO> updateMovimiento(@PathVariable Long id, @Valid @RequestBody MovimientoRequestDTO movimientoRequestDTO) {
         MovimientoResponseDTO updatedMovimiento = movimientoService.update(id, movimientoRequestDTO);
         return ResponseEntity.ok(updatedMovimiento);
     }
 
+    @Operation(summary = "Eliminar un movimiento")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteMovimiento(@PathVariable Long id) {
         movimientoService.delete(id);

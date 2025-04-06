@@ -1,10 +1,10 @@
 package com.example.personaservice.service;
 
-
 import com.example.personaservice.dto.request.ClienteRequestDTO;
 import com.example.personaservice.dto.response.ClienteResponseDTO;
 import com.example.personaservice.entity.Cliente;
 import com.example.personaservice.exception.ClienteServiceException;
+import com.example.personaservice.messaging.ClienteEventPublisher;
 import com.example.personaservice.repository.ClienteRepository;
 import com.example.personaservice.service.impl.ClienteServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,7 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.modelmapper.ModelMapper;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.Optional;
 
@@ -20,13 +21,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+
 class ClienteServiceImplTest {
 
     @Mock
     private ClienteRepository clienteRepository;
 
     @Mock
-    private RabbitTemplate rabbitTemplate;
+    private ModelMapper modelMapper;
+
+    @Mock
+    private BCryptPasswordEncoder passwordEncoder;
+
+    @Mock
+    private ClienteEventPublisher clienteEventPublisher;
 
     @InjectMocks
     private ClienteServiceImpl clienteService;
@@ -50,19 +58,26 @@ class ClienteServiceImplTest {
         cliente.setDireccion("Calle Falsa 123");
         cliente.setEstado(true);
 
+        ClienteResponseDTO responseDTO = new ClienteResponseDTO();
+        responseDTO.setClienteId(1L);
+        responseDTO.setNombre("Juan Pérez");
+
         when(clienteRepository.findByIdentificacion("12345")).thenReturn(Optional.empty());
+        when(modelMapper.map(request, Cliente.class)).thenReturn(cliente);
+        when(passwordEncoder.encode("password")).thenReturn("encoded-password");
         when(clienteRepository.save(any(Cliente.class))).thenReturn(cliente);
+        when(modelMapper.map(cliente, ClienteResponseDTO.class)).thenReturn(responseDTO);
 
         ClienteResponseDTO response = clienteService.create(request);
 
         assertThat(response).isNotNull();
         assertThat(response.getNombre()).isEqualTo("Juan Pérez");
         verify(clienteRepository, times(1)).save(any(Cliente.class));
+        verify(clienteEventPublisher, times(1)).publicarEvento("CREATE", cliente);
     }
 
     @Test
     void testCreateCliente_NullName() {
-
         ClienteRequestDTO request = new ClienteRequestDTO();
         request.setDireccion("Calle Falsa 123");
         request.setIdentificacion("12345");
@@ -75,7 +90,6 @@ class ClienteServiceImplTest {
 
     @Test
     void testCreateCliente_AlreadyRegistered() {
-
         ClienteRequestDTO request = new ClienteRequestDTO();
         request.setNombre("Juan Pérez");
         request.setDireccion("Calle Falsa 123");
@@ -91,16 +105,19 @@ class ClienteServiceImplTest {
 
     @Test
     void testCreateCliente_RepositoryThrowsException() {
-
         ClienteRequestDTO request = new ClienteRequestDTO();
         request.setNombre("Juan Pérez");
         request.setDireccion("Calle Falsa 123");
         request.setIdentificacion("12345");
         request.setContraseña("password");
 
-        when(clienteRepository.findByIdentificacion("12345")).thenReturn(Optional.empty());
-        when(clienteRepository.save(any(Cliente.class))).thenThrow(new RuntimeException("Error al guardar en la base de datos"));
+        Cliente cliente = new Cliente();
+        cliente.setNombre("Juan Pérez");
 
+        when(clienteRepository.findByIdentificacion("12345")).thenReturn(Optional.empty());
+        when(modelMapper.map(request, Cliente.class)).thenReturn(cliente);
+        when(passwordEncoder.encode("password")).thenReturn("encoded-password");
+        when(clienteRepository.save(any(Cliente.class))).thenThrow(new RuntimeException("Error al guardar en la base de datos"));
 
         RuntimeException exception = assertThrows(RuntimeException.class, () -> clienteService.create(request));
         assertThat(exception.getMessage()).isEqualTo("Error al guardar en la base de datos");

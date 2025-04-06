@@ -1,18 +1,25 @@
 package com.example.cuentaservice.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString(exclude = "movimientos")
 @Entity
 @Table(name = "cuenta")
 public class Cuenta {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long cuentaId;
 
     @Column(nullable = false, unique = true)
     private String numeroCuenta;
@@ -32,6 +39,8 @@ public class Cuenta {
     @Column(nullable = false)
     private Long clienteId;
 
+    @JsonIgnore
+    @Schema(hidden = true)
     @OneToMany(mappedBy = "cuenta", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Movimiento> movimientos = new ArrayList<>();
 }

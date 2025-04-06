@@ -1,4 +1,4 @@
-package com.example.personaservice.dto.event;
+package com.example.personaservice.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

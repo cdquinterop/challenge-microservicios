@@ -12,6 +12,8 @@ public class ClienteServiceException extends RuntimeException {
     public static final String CLIENTE_DELETION_ERROR = "Error al eliminar el cliente.";
     public static final String CLIENTE_ALREADY_REGISTERED = "Cliente ya registrado con la identificación: ";
     public static final String CLIENTE_NAME_EMPTY = "El nombre del cliente no puede estar vacío.";
+    public static final String CLIENTE_PASSWORD_REQUIRED = "La contraseña es obligatoria.";
+
 
     public ClienteServiceException(String message) {
         super(message);

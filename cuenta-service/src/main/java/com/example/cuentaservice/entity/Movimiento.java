@@ -1,18 +1,24 @@
 package com.example.cuentaservice.entity;
 
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString(exclude = "cuenta")
 @Entity
 @Table(name = "movimiento")
 public class Movimiento {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long movimientoId;
 
     @Column(nullable = false)
     private LocalDateTime fecha;
@@ -26,8 +32,9 @@ public class Movimiento {
     @Column(nullable = false)
     private Double saldo;
 
+    @JsonIgnore
+    @Schema(hidden = true)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cuenta_id", nullable = false)
     private Cuenta cuenta;
 }
-

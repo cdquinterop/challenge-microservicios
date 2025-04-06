@@ -1,12 +1,15 @@
 package com.example.personaservice.entity;
 
-
-import jakarta.persistence.*;
-import lombok.Data;
-
+import jakarta.persistence.Column;
+import jakarta.persistence.MappedSuperclass;
+import lombok.*;
 
 @MappedSuperclass
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString
 public abstract class Persona {
 
     @Column(nullable = false)

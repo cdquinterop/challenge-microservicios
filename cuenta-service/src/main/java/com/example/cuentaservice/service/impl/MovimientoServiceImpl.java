@@ -18,154 +18,131 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static com.example.cuentaservice.exception.CuentaServiceException.*;
+import static com.example.cuentaservice.exception.MovimientoServiceException.*;
+
 @Service
 @RequiredArgsConstructor
 public class MovimientoServiceImpl implements MovimientoService {
 
     private final MovimientoRepository movimientoRepository;
     private final CuentaRepository cuentaRepository;
-    private final ModelMapper modelMapper = new ModelMapper();
+    private final ModelMapper modelMapper;
+
+    private static final String DEPOSITO = "DEPOSITO";
+    private static final String RETIRO = "RETIRO";
 
     @Override
     public List<MovimientoResponseDTO> findAll() {
-        try {
-            return movimientoRepository.findAll().stream()
-                    .map(movimiento -> {
-                        MovimientoResponseDTO dto = modelMapper.map(movimiento, MovimientoResponseDTO.class);
-                        dto.setNumeroCuenta(movimiento.getCuenta().getNumeroCuenta());
-                        return dto;
-                    })
-                    .collect(Collectors.toList());
-        } catch (Exception e) {
-            throw new MovimientoServiceException("Error al obtener los movimientos.", e);
-        }
+        return movimientoRepository.findAll().stream()
+                .map(mov -> {
+                    MovimientoResponseDTO dto = modelMapper.map(mov, MovimientoResponseDTO.class);
+                    dto.setNumeroCuenta(mov.getCuenta().getNumeroCuenta());
+                    return dto;
+                })
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
-    public MovimientoResponseDTO create(MovimientoRequestDTO movimientoRequestDTO) {
-        try {
-            Cuenta cuenta = cuentaRepository.findById(movimientoRequestDTO.getCuentaId())
-                    .orElseThrow(() -> new CuentaServiceException(CuentaServiceException.CUENTA_NOT_FOUND));
+    public MovimientoResponseDTO create(MovimientoRequestDTO dto) {
+        Cuenta cuenta = obtenerCuentaActiva(dto.getCuentaId());
+        validarMovimiento(dto);
 
-            if (!cuenta.getEstado()) {
+        double nuevoSaldo = calcularNuevoSaldo(dto.getTipoMovimiento(), dto.getMonto(), cuenta.getSaldoDisponible());
 
-                throw new CuentaServiceException(CuentaServiceException.INACTIVE_ACCOUNT);
-            }
+        Movimiento movimiento = new Movimiento();
+        movimiento.setFecha(LocalDateTime.now());
+        movimiento.setTipoMovimiento(dto.getTipoMovimiento().toUpperCase());
+        movimiento.setValor(obtenerValorConSigno(dto.getTipoMovimiento(), dto.getMonto()));
+        movimiento.setSaldo(nuevoSaldo);
+        movimiento.setCuenta(cuenta);
 
-            String tipoMovimiento = movimientoRequestDTO.getTipoMovimiento().toUpperCase();
-            if (!List.of("DEPOSITO", "RETIRO").contains(tipoMovimiento)) {
-                throw new MovimientoServiceException(MovimientoServiceException.INVALID_MOVEMENT_TYPE);
-            }
+        Movimiento saved = movimientoRepository.save(movimiento);
 
-            if (movimientoRequestDTO.getMonto() <= 0) {
-                throw new MovimientoServiceException(MovimientoServiceException.INVALID_MOVEMENT_VALUE);
-            }
+        cuenta.setSaldoDisponible(nuevoSaldo);
+        cuentaRepository.save(cuenta);
 
-            Double nuevoSaldo;
-            if (tipoMovimiento.equals("RETIRO")) {
-                nuevoSaldo = cuenta.getSaldoDisponible() - movimientoRequestDTO.getMonto();
-                if (nuevoSaldo < 0) {
-                    throw new CuentaServiceException(CuentaServiceException.INSUFFICIENT_BALANCE);
-                }
-            } else {
-                nuevoSaldo = cuenta.getSaldoDisponible() + movimientoRequestDTO.getMonto();
-            }
-
-            Movimiento movimiento = new Movimiento();
-            movimiento.setFecha(LocalDateTime.now());
-            movimiento.setTipoMovimiento(tipoMovimiento);
-            movimiento.setValor(tipoMovimiento.equals("RETIRO") ? -movimientoRequestDTO.getMonto() : movimientoRequestDTO.getMonto());
-            movimiento.setSaldo(nuevoSaldo);
-            movimiento.setCuenta(cuenta);
-
-            Movimiento savedMovimiento = movimientoRepository.save(movimiento);
-
-            cuenta.setSaldoDisponible(nuevoSaldo);
-            cuentaRepository.save(cuenta);
-
-            return modelMapper.map(savedMovimiento, MovimientoResponseDTO.class);
-        } catch (CuentaServiceException | MovimientoServiceException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new MovimientoServiceException(MovimientoServiceException.MOVIMIENTO_CREATION_ERROR, e);
-        }
+        return modelMapper.map(saved, MovimientoResponseDTO.class);
     }
-
-
 
     @Override
     @Transactional
-    public MovimientoResponseDTO update(Long id, MovimientoRequestDTO movimientoRequestDTO) {
-        try {
-            Movimiento movimiento = movimientoRepository.findById(id)
-                    .orElseThrow(() -> new MovimientoServiceException("Movimiento no encontrado"));
+    public MovimientoResponseDTO update(Long id, MovimientoRequestDTO dto) {
+        Movimiento movimiento = movimientoRepository.findById(id)
+                .orElseThrow(() -> new MovimientoServiceException(MOVIMIENTO_NOT_FOUND));
 
-            Cuenta cuenta = cuentaRepository.findById(movimientoRequestDTO.getCuentaId())
-                    .orElseThrow(() -> new CuentaServiceException(CuentaServiceException.CUENTA_NOT_FOUND));
+        Cuenta cuenta = obtenerCuentaActiva(dto.getCuentaId());
+        validarMovimiento(dto);
 
-            if (!cuenta.getEstado()) {
-                throw new CuentaServiceException(CuentaServiceException.INACTIVE_ACCOUNT);
-            }
+        double nuevoSaldo = calcularNuevoSaldo(dto.getTipoMovimiento(), dto.getMonto(), cuenta.getSaldoDisponible());
 
-            String tipoMovimiento = movimientoRequestDTO.getTipoMovimiento().toUpperCase();
-            if (!List.of("DEPOSITO", "RETIRO").contains(tipoMovimiento)) {
-                throw new MovimientoServiceException(MovimientoServiceException.INVALID_MOVEMENT_TYPE);
-            }
+        movimiento.setFecha(LocalDateTime.now());
+        movimiento.setTipoMovimiento(dto.getTipoMovimiento().toUpperCase());
+        movimiento.setValor(obtenerValorConSigno(dto.getTipoMovimiento(), dto.getMonto()));
+        movimiento.setSaldo(nuevoSaldo);
+        movimiento.setCuenta(cuenta);
 
-            if (movimientoRequestDTO.getMonto() <= 0) {
-                throw new MovimientoServiceException(MovimientoServiceException.INVALID_MOVEMENT_VALUE);
-            }
+        Movimiento updated = movimientoRepository.save(movimiento);
 
-            Double nuevoSaldo;
-            if (tipoMovimiento.equals("RETIRO")) {
-                nuevoSaldo = cuenta.getSaldoDisponible() - movimientoRequestDTO.getMonto();
-                if (nuevoSaldo < 0) {
-                    throw new CuentaServiceException(CuentaServiceException.INSUFFICIENT_BALANCE);
-                }
-            } else {
-                nuevoSaldo = cuenta.getSaldoDisponible() + movimientoRequestDTO.getMonto();
-            }
+        cuenta.setSaldoDisponible(nuevoSaldo);
+        cuentaRepository.save(cuenta);
 
-            movimiento.setFecha(LocalDateTime.now());
-            movimiento.setTipoMovimiento(tipoMovimiento);
-            movimiento.setValor(tipoMovimiento.equals("RETIRO") ? -movimientoRequestDTO.getMonto() : movimientoRequestDTO.getMonto());
-            movimiento.setSaldo(nuevoSaldo);
-            movimiento.setCuenta(cuenta);
-
-            Movimiento updatedMovimiento = movimientoRepository.save(movimiento);
-
-            cuenta.setSaldoDisponible(nuevoSaldo);
-            cuentaRepository.save(cuenta);
-
-            return modelMapper.map(updatedMovimiento, MovimientoResponseDTO.class);
-        } catch (CuentaServiceException | MovimientoServiceException e) {
-            throw new MovimientoServiceException("Error al actualizar el movimiento: " + e.getMessage(), e);
-        } catch (Exception e) {
-            throw new MovimientoServiceException(MovimientoServiceException.MOVIMIENTO_UPDATE_ERROR, e);
-        }
+        return modelMapper.map(updated, MovimientoResponseDTO.class);
     }
 
     @Override
     @Transactional
     public void delete(Long id) {
-        try {
-            Movimiento movimiento = movimientoRepository.findById(id)
-                    .orElseThrow(() -> new MovimientoServiceException(MovimientoServiceException.MOVIMIENTO_NOT_FOUND));
+        Movimiento movimiento = movimientoRepository.findById(id)
+                .orElseThrow(() -> new MovimientoServiceException(MOVIMIENTO_NOT_FOUND));
 
-            Cuenta cuenta = movimiento.getCuenta();
-            Double nuevoSaldo = cuenta.getSaldoDisponible() - movimiento.getValor();
+        Cuenta cuenta = movimiento.getCuenta();
+        double nuevoSaldo = cuenta.getSaldoDisponible() - movimiento.getValor();
 
-            movimientoRepository.delete(movimiento);
+        movimientoRepository.delete(movimiento);
 
-            cuenta.setSaldoDisponible(nuevoSaldo);
-            cuentaRepository.save(cuenta);
-        } catch (Exception e) {
-            throw new MovimientoServiceException("Error al eliminar el movimiento.", e);
+        cuenta.setSaldoDisponible(nuevoSaldo);
+        cuentaRepository.save(cuenta);
+    }
+
+
+    private Cuenta obtenerCuentaActiva(Long cuentaId) {
+        Cuenta cuenta = cuentaRepository.findById(cuentaId)
+                .orElseThrow(() -> new CuentaServiceException(CUENTA_NOT_FOUND));
+
+        if (!Boolean.TRUE.equals(cuenta.getEstado())) {
+            throw new CuentaServiceException(INACTIVE_ACCOUNT);
+        }
+        return cuenta;
+    }
+
+    private void validarMovimiento(MovimientoRequestDTO dto) {
+        String tipo = dto.getTipoMovimiento().toUpperCase();
+
+        if (!List.of(DEPOSITO, RETIRO).contains(tipo)) {
+            throw new MovimientoServiceException(INVALID_MOVEMENT_TYPE);
+        }
+
+        if (dto.getMonto() == null || dto.getMonto() <= 0) {
+            throw new MovimientoServiceException(INVALID_MOVEMENT_VALUE);
         }
     }
 
-    private boolean isValidMovementType(String tipoMovimiento) {
-        return tipoMovimiento.equals("DEPOSITO") || tipoMovimiento.equals("RETIRO");
+    private double calcularNuevoSaldo(String tipoMovimiento, Double monto, Double saldoActual) {
+        String tipo = tipoMovimiento.toUpperCase();
+
+        if (RETIRO.equals(tipo)) {
+            double nuevoSaldo = saldoActual - monto;
+            if (nuevoSaldo < 0) {
+                throw new CuentaServiceException(INSUFFICIENT_BALANCE);
+            }
+            return nuevoSaldo;
+        }
+        return saldoActual + monto;
+    }
+
+    private double obtenerValorConSigno(String tipoMovimiento, Double monto) {
+        return RETIRO.equalsIgnoreCase(tipoMovimiento) ? -monto : monto;
     }
 }

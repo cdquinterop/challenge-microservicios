@@ -1,11 +1,10 @@
 package com.example.cuentaservice.service;
 
 import com.example.cuentaservice.dto.response.ReporteResponseDTO;
-import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 
-@Service
 public interface ReporteService {
-    List<ReporteResponseDTO> getReporte(String fechaInicio, String fechaFin, Long clienteId);
+    List<ReporteResponseDTO> getReporte(LocalDate fechaInicio, LocalDate fechaFin, Long clienteId);
 }

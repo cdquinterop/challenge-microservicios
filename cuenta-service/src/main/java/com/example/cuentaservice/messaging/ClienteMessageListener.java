@@ -1,12 +1,14 @@
 package com.example.cuentaservice.messaging;
 
-import com.example.cuentaservice.cache.ClienteCache;
-import com.example.cuentaservice.dto.cache.ClienteCacheDTO;
+import com.example.cuentaservice.config.RabbitMQConfig;
 import com.example.cuentaservice.dto.event.ClienteEventDTO;
+import com.example.cuentaservice.entity.Cliente;
 import com.example.cuentaservice.entity.Cuenta;
+import com.example.cuentaservice.repository.ClienteRepository;
 import com.example.cuentaservice.repository.CuentaRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
@@ -14,77 +16,70 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class ClienteMessageListener {
 
-    private final ClienteCache clienteCache;
+    private final ClienteRepository clienteRepository;
     private final CuentaRepository cuentaRepository;
 
-    @RabbitListener(queues = "clienteQueue")
-    public void handleClienteEvent(ClienteEventDTO clienteEvent) {
-        System.out.println("Mensaje recibido: " + clienteEvent);
+    @RabbitListener(queues = RabbitMQConfig.CLIENTE_QUEUE)
+    public void handleClienteEvent(ClienteEventDTO event) {
+        log.info(" Evento recibido desde RabbitMQ: {}", event);
 
-        switch (clienteEvent.getAction().toUpperCase()) {
-            case "CREATE":
-                handleClienteCreado(clienteEvent);
-                break;
-
-            case "UPDATE":
-                handleClienteActualizado(clienteEvent);
-                break;
-
-            case "DELETE":
-                handleClienteEliminado(clienteEvent);
-                break;
-
-            default:
-                System.out.println("Acción no reconocida: " + clienteEvent.getAction());
+        String action = event.getAction().toUpperCase();
+        switch (action) {
+            case "CREATE" -> procesarCreacion(event);
+            case "UPDATE" -> procesarActualizacion(event);
+            case "DELETE" -> procesarEliminacion(event);
+            default -> log.warn("⚠️ Acción no reconocida: {}", action);
         }
     }
 
     @Transactional
-    private void handleClienteCreado(ClienteEventDTO clienteEvent) {
-        System.out.println("Cliente creado: " + clienteEvent);
-
-        // Registrar en cache
-        ClienteCacheDTO cliente = new ClienteCacheDTO();
-        cliente.setClienteId(clienteEvent.getClienteId());
-        cliente.setNombre(clienteEvent.getNombre());
-        cliente.setEstado(clienteEvent.getEstado());
-        clienteCache.putCliente(clienteEvent.getClienteId(), cliente);
+    protected void procesarCreacion(ClienteEventDTO event) {
+        Cliente cliente = mapToEntity(event);
+        clienteRepository.save(cliente);
+        log.info(" Cliente creado: {}", cliente);
     }
 
     @Transactional
-    private void handleClienteActualizado(ClienteEventDTO clienteEvent) {
-        System.out.println("Cliente actualizado: " + clienteEvent);
+    protected void procesarActualizacion(ClienteEventDTO event) {
+        Cliente cliente = clienteRepository.findByClienteId(event.getClienteId())
+                .orElseGet(() -> new Cliente());
 
-        ClienteCacheDTO cliente = clienteCache.getCliente(clienteEvent.getClienteId());
-        if (cliente != null) {
-            cliente.setNombre(clienteEvent.getNombre());
-            cliente.setEstado(clienteEvent.getEstado());
-            clienteCache.putCliente(clienteEvent.getClienteId(), cliente);
-        } else {
-            ClienteCacheDTO nuevoCliente = new ClienteCacheDTO();
-            nuevoCliente.setClienteId(clienteEvent.getClienteId());
-            nuevoCliente.setNombre(clienteEvent.getNombre());
-            nuevoCliente.setEstado(clienteEvent.getEstado());
-            clienteCache.putCliente(clienteEvent.getClienteId(), nuevoCliente);
-        }
+        cliente.setClienteId(event.getClienteId());
+        cliente.setNombre(event.getNombre());
+        cliente.setEstado(event.getEstado());
+
+        clienteRepository.save(cliente);
+        log.info(" Cliente actualizado: {}", cliente);
     }
 
     @Transactional
-    private void handleClienteEliminado(ClienteEventDTO clienteEvent) {
-        System.out.println("Cliente eliminado: " + clienteEvent);
+    protected void procesarEliminacion(ClienteEventDTO event) {
+        Cliente cliente = clienteRepository.findByClienteId(event.getClienteId())
+                .orElse(null);
 
-        ClienteCacheDTO cliente = clienteCache.getCliente(clienteEvent.getClienteId());
         if (cliente != null) {
             cliente.setEstado(false);
-            clienteCache.putCliente(clienteEvent.getClienteId(), cliente);
+            clienteRepository.save(cliente);
+            log.info(" Cliente desactivado: {}", cliente);
         }
 
-        List<Cuenta> cuentas = cuentaRepository.findAllByClienteId(clienteEvent.getClienteId());
-        for (Cuenta cuenta : cuentas) {
+        List<Cuenta> cuentas = cuentaRepository.findAllByClienteId(event.getClienteId());
+        cuentas.forEach(cuenta -> {
             cuenta.setEstado(false);
             cuentaRepository.save(cuenta);
-        }
+        });
+
+        log.info(" Se desactivaron {} cuentas asociadas al cliente {}", cuentas.size(), event.getClienteId());
+    }
+
+    private Cliente mapToEntity(ClienteEventDTO dto) {
+        Cliente cliente = new Cliente();
+        cliente.setClienteId(dto.getClienteId());
+        cliente.setNombre(dto.getNombre());
+        cliente.setEstado(dto.getEstado());
+        return cliente;
     }
 }

@@ -1,10 +1,6 @@
 package com.example.personaservice.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.DirectExchange;
-import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
@@ -14,13 +10,13 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    public static final String CLIENTE_QUEUE = "clienteQueue";
-    public static final String CLIENTE_EXCHANGE = "clienteExchange";
-    public static final String CLIENTE_ROUTING_KEY = "clienteRoutingKey";
+    public static final String CLIENTE_QUEUE = "cliente.queue";
+    public static final String CLIENTE_EXCHANGE = "cliente.exchange";
+    public static final String CLIENTE_ROUTING_KEY = "cliente.routing.key";
 
     @Bean
     public Queue clienteQueue() {
-        return new Queue(CLIENTE_QUEUE, true);
+        return QueueBuilder.durable(CLIENTE_QUEUE).build();
     }
 
     @Bean

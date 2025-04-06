@@ -1,10 +1,14 @@
 package com.example.cuentaservice.dto.response;
 
-import lombok.Data;
+import lombok.*;
 
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString
 public class CuentaResponseDTO {
-    private Long id;
+    private Long cuentaId;
     private String numeroCuenta;
     private String tipoCuenta;
     private Double saldoInicial;

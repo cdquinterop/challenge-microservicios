@@ -1,130 +1,123 @@
 package com.example.personaservice.service.impl;
 
-import com.example.personaservice.config.RabbitMQConfig;
-import com.example.personaservice.dto.event.ClienteEventDTO;
 import com.example.personaservice.dto.request.ClienteRequestDTO;
 import com.example.personaservice.dto.response.ClienteResponseDTO;
 import com.example.personaservice.entity.Cliente;
 import com.example.personaservice.exception.ClienteServiceException;
+import com.example.personaservice.messaging.ClienteEventPublisher;
 import com.example.personaservice.repository.ClienteRepository;
 import com.example.personaservice.service.ClienteService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ClienteServiceImpl implements ClienteService {
 
     private final ClienteRepository clienteRepository;
-    private final RabbitTemplate rabbitTemplate;
-    private final ModelMapper modelMapper = new ModelMapper();
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final ModelMapper modelMapper;
+    private final BCryptPasswordEncoder passwordEncoder;
+    private final ClienteEventPublisher clienteEventPublisher;
 
     @Override
     public List<ClienteResponseDTO> findAll() {
         return clienteRepository.findAll().stream()
-                .map(cliente -> modelMapper.map(cliente, ClienteResponseDTO.class))
+                .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
     @Override
     public ClienteResponseDTO findById(Long id) {
-        Cliente cliente = findClienteOrThrow(id);
-        return modelMapper.map(cliente, ClienteResponseDTO.class);
+        return toResponse(findClienteOrThrow(id));
     }
 
     @Override
-    public ClienteResponseDTO create(ClienteRequestDTO clienteRequestDTO) {
-        // Validación del nombre
-        if (clienteRequestDTO.getNombre() == null || clienteRequestDTO.getNombre().trim().isEmpty()) {
-            throw new IllegalArgumentException(ClienteServiceException.CLIENTE_NAME_EMPTY);
+    public ClienteResponseDTO create(ClienteRequestDTO dto) {
+        validarDatos(dto);
+
+        if (clienteRepository.findByIdentificacion(dto.getIdentificacion()).isPresent()) {
+            throw new ClienteServiceException(ClienteServiceException.CLIENTE_ALREADY_REGISTERED + dto.getIdentificacion());
         }
 
-        // Validación de identificación duplicada
-        if (clienteRepository.findByIdentificacion(clienteRequestDTO.getIdentificacion()).isPresent()) {
-            throw new ClienteServiceException(ClienteServiceException.CLIENTE_ALREADY_REGISTERED + clienteRequestDTO.getIdentificacion());
-        }
+        Cliente cliente = toEntity(dto);
+        cliente.setContraseña(passwordEncoder.encode(dto.getContraseña()));
 
-        Cliente cliente = modelMapper.map(clienteRequestDTO, Cliente.class);
-        cliente.setContraseña(passwordEncoder.encode(clienteRequestDTO.getContraseña()));
-
-        try {
-            Cliente savedCliente = clienteRepository.save(cliente);
-            publishClienteEvent("CREATE", savedCliente);
-            return modelMapper.map(savedCliente, ClienteResponseDTO.class);
-        } catch (Exception e) {
-            throw new RuntimeException("Error al guardar en la base de datos", e);
-        }
+        Cliente saved = guardarCliente(cliente, "CREATE");
+        return toResponse(saved);
     }
 
     @Override
-    public ClienteResponseDTO update(Long id, ClienteRequestDTO clienteRequestDTO) {
-        Cliente existingCliente = findClienteOrThrow(id);
+    public ClienteResponseDTO update(Long id, ClienteRequestDTO dto) {
+        Cliente existente = findClienteOrThrow(id);
 
-        Cliente updatedCliente = modelMapper.map(clienteRequestDTO, Cliente.class);
-        updatedCliente.setClienteId(existingCliente.getClienteId());
-        updatedCliente.setContraseña(getUpdatedPassword(clienteRequestDTO.getContraseña(), existingCliente.getContraseña()));
+        Cliente actualizado = toEntity(dto);
+        actualizado.setClienteId(existente.getClienteId());
+        actualizado.setContraseña(getUpdatedPassword(dto.getContraseña(), existente.getContraseña()));
 
-        try {
-            Cliente savedCliente = clienteRepository.save(updatedCliente);
-            publishClienteEvent("UPDATE", savedCliente);
-            return modelMapper.map(savedCliente, ClienteResponseDTO.class);
-        } catch (Exception e) {
-            throw new ClienteServiceException(ClienteServiceException.CLIENTE_UPDATE_ERROR, e);
-        }
+        Cliente saved = guardarCliente(actualizado, "UPDATE");
+        return toResponse(saved);
     }
 
     @Override
     public void delete(Long id) {
         Cliente cliente = findClienteOrThrow(id);
-
-        try {
-            clienteRepository.delete(cliente);
-            cliente.setEstado(false);
-            publishClienteEvent("DELETE", cliente);
-        } catch (Exception e) {
-            throw new ClienteServiceException(ClienteServiceException.CLIENTE_DELETION_ERROR, e);
-        }
+        cliente.setEstado(false);
+        guardarCliente(cliente, "DELETE");
     }
+
 
     private Cliente findClienteOrThrow(Long id) {
         return clienteRepository.findById(id)
                 .orElseThrow(() -> new ClienteServiceException(ClienteServiceException.CLIENTE_NOT_FOUND + " con ID: " + id));
     }
 
-    private String getUpdatedPassword(String newPassword, String existingPassword) {
-        if (newPassword != null && !newPassword.isEmpty()) {
-            return passwordEncoder.encode(newPassword);
+    private Cliente guardarCliente(Cliente cliente, String action) {
+        try {
+            Cliente saved = clienteRepository.save(cliente);
+            clienteEventPublisher.publicarEvento(action, saved);
+            return saved;
+        } catch (Exception ex) {
+            log.error("Error al guardar cliente. Acción: {}, ID: {}, Error: {}", action, cliente.getClienteId(), ex.getMessage(), ex);
+            throw new ClienteServiceException(errorMensajePorAccion(action), ex);
         }
-        return existingPassword;
     }
 
-    private void publishClienteEvent(String action, Cliente cliente) {
-        try {
-            ClienteEventDTO clienteEvent = new ClienteEventDTO(
-                    action,
-                    cliente.getClienteId(),
-                    cliente.getNombre(),
-                    cliente.getEstado()
-            );
+    private String getUpdatedPassword(String nueva, String actual) {
+        return (nueva != null && !nueva.isBlank()) ? passwordEncoder.encode(nueva) : actual;
+    }
 
-            rabbitTemplate.convertAndSend(
-                    RabbitMQConfig.CLIENTE_EXCHANGE,
-                    RabbitMQConfig.CLIENTE_ROUTING_KEY,
-                    clienteEvent
-            );
-
-            System.out.println("Evento publicado: " + clienteEvent);
-        } catch (Exception e) {
-            throw new ClienteServiceException("Error al publicar evento RabbitMQ", e);
+    private void validarDatos(ClienteRequestDTO dto) {
+        if (dto.getNombre() == null || dto.getNombre().isBlank()) {
+            throw new IllegalArgumentException(ClienteServiceException.CLIENTE_NAME_EMPTY);
         }
+        if (dto.getContraseña() == null || dto.getContraseña().isBlank()) {
+            throw new IllegalArgumentException(ClienteServiceException.CLIENTE_PASSWORD_REQUIRED);
+
+        }
+    }
+
+    private Cliente toEntity(ClienteRequestDTO dto) {
+        return modelMapper.map(dto, Cliente.class);
+    }
+
+    private ClienteResponseDTO toResponse(Cliente cliente) {
+        return modelMapper.map(cliente, ClienteResponseDTO.class);
+    }
+
+    private String errorMensajePorAccion(String action) {
+        return switch (action) {
+            case "CREATE" -> ClienteServiceException.CLIENTE_CREATION_ERROR;
+            case "UPDATE" -> ClienteServiceException.CLIENTE_UPDATE_ERROR;
+            case "DELETE" -> ClienteServiceException.CLIENTE_DELETION_ERROR;
+            default -> "Error desconocido en operación de cliente.";
+        };
     }
 }
-
-

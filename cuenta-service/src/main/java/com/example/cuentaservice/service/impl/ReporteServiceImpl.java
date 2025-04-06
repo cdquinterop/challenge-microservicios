@@ -14,9 +14,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static com.example.cuentaservice.exception.ReporteServiceException.CLIENTE_SIN_CUENTAS;
 
 @Service
 @RequiredArgsConstructor
@@ -24,45 +25,41 @@ public class ReporteServiceImpl implements ReporteService {
 
     private final CuentaRepository cuentaRepository;
     private final MovimientoRepository movimientoRepository;
-    private final ModelMapper modelMapper = new ModelMapper();
+    private final ModelMapper modelMapper;
 
     @Override
-    public List<ReporteResponseDTO> getReporte(String fechaInicio, String fechaFin, Long clienteId) {
-        try {
-            DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    public List<ReporteResponseDTO> getReporte(LocalDate fechaInicio, LocalDate fechaFin, Long clienteId) {
+        LocalDateTime inicio = fechaInicio.atStartOfDay();
+        LocalDateTime fin = fechaFin.atTime(23, 59, 59);
 
-            LocalDateTime inicio = LocalDate.parse(fechaInicio.trim(), dateFormatter).atStartOfDay();
-            LocalDateTime fin = LocalDate.parse(fechaFin.trim(), dateFormatter).atTime(23, 59, 59);
-
-            List<Cuenta> cuentas = cuentaRepository.findAllByClienteId(clienteId);
-
-            if (cuentas.isEmpty()) {
-                throw new ReporteServiceException("No se encontraron cuentas para el cliente ID " + clienteId);
-            }
-
-            return cuentas.stream().map(cuenta -> {
-                List<Movimiento> movimientos = movimientoRepository.findAllByCuentaIdAndFechaBetween(
-                        cuenta.getId(), inicio, fin);
-
-                List<MovimientoResponseDTO> movimientosDTO = movimientos.stream()
-                        .map(movimiento -> modelMapper.map(movimiento, MovimientoResponseDTO.class))
-                        .collect(Collectors.toList());
-
-                return buildReporteResponseDTO(cuenta, movimientosDTO);
-            }).collect(Collectors.toList());
-        } catch (ReporteServiceException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ReporteServiceException("Error al generar el reporte.", e);
+        List<Cuenta> cuentas = cuentaRepository.findAllByClienteId(clienteId);
+        if (cuentas.isEmpty()) {
+            throw new ReporteServiceException(CLIENTE_SIN_CUENTAS);
         }
+
+        return cuentas.stream()
+                .map(cuenta -> buildReporteResponseDTO(cuenta, inicio, fin))
+                .collect(Collectors.toList());
     }
 
-    private ReporteResponseDTO buildReporteResponseDTO(Cuenta cuenta, List<MovimientoResponseDTO> movimientosDTO) {
+    private ReporteResponseDTO buildReporteResponseDTO(Cuenta cuenta, LocalDateTime inicio, LocalDateTime fin) {
+        List<Movimiento> movimientos = movimientoRepository.findAllByCuenta_CuentaIdAndFechaBetween(
+                cuenta.getCuentaId(), inicio, fin);
+
+        List<MovimientoResponseDTO> movimientosDTO = movimientos.stream()
+                .map(mov -> {
+                    MovimientoResponseDTO dto = modelMapper.map(mov, MovimientoResponseDTO.class);
+                    dto.setNumeroCuenta(cuenta.getNumeroCuenta());
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
         ReporteResponseDTO reporte = new ReporteResponseDTO();
         reporte.setNumeroCuenta(cuenta.getNumeroCuenta());
         reporte.setSaldoInicial(cuenta.getSaldoInicial());
         reporte.setSaldoDisponible(cuenta.getSaldoDisponible());
         reporte.setMovimientos(movimientosDTO);
+
         return reporte;
     }
 }
