@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CustomerEventDTO {
     private String action;
-    private Long clienteId;
-    private String nombre;
-    private Boolean estado;
+    private Long customerId;
+    private String name;
+    private Boolean status;
 }

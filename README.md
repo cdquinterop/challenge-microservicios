@@ -1,93 +1,93 @@
-# Challenge Microservicios - Solución Técnica
+# Microservices Challenge – Technical Solution
 
-Este proyecto implementa una arquitectura de microservicios basada en Spring Boot, que permite la gestión de clientes y cuentas bancarias, incluyendo operaciones de creación, actualización, consulta y eliminación, utilizando PostgreSQL como base de datos y RabbitMQ para comunicación asíncrona entre servicios.
+This project implements a microservices architecture based on Spring Boot, enabling the management of customers and bank accounts. It supports operations such as creation, updating, querying, and logical deletion, using PostgreSQL as the database and RabbitMQ for asynchronous communication between services.
 
-## Tabla de contenidos
+## Table of Contents
 
-1. [Arquitectura](#arquitectura)
-2. [Levantamiento con Docker](#levantamiento-con-docker)
-3. [Colección Postman](#colección-postman)
-4. [Ejecución de Tests](#ejecución-de-tests)
-5. [Tecnologías](#tecnologías)
-6. [Repositorio](#repositorio)
-
----
-
-## Arquitectura
-
-El sistema está compuesto por los siguientes microservicios:
-
-- **persona-service**: Maneja información de clientes (crear, actualizar, consultar, eliminar lógicamente).
-- **cuenta-service**: Administra cuentas bancarias asociadas a los clientes y registra movimientos.
-- **RabbitMQ**: Utilizado para la comunicación asíncrona de eventos (cliente creado, actualizado, eliminado).
-- **PostgreSQL**: Base de datos relacional para persistencia.
+1. [Architecture](#architecture)  
+2. [Docker Setup](#docker-setup)  
+3. [Postman Collection](#postman-collection)  
+4. [Test Execution](#test-execution)  
+5. [Technologies](#technologies)  
+6. [Repository](#repository)
 
 ---
 
-## Levantamiento con Docker
+## Architecture
 
-### Instrucciones
+The system consists of the following microservices:
 
-1. Asegúrate de tener [Docker](https://docs.docker.com/get-docker/) y [Docker Compose](https://docs.docker.com/compose/) instalados.
-2. Ejecuta el siguiente comando desde la raíz del proyecto:
+- **person-service**: Manages customer information (create, update, retrieve, logically delete).
+- **account-service**: Handles bank accounts associated with customers and records account transactions.
+- **RabbitMQ**: Used for asynchronous communication of events (customer created, updated, deleted).
+- **PostgreSQL**: Relational database used for persistence.
+
+---
+
+## Docker Setup
+
+### Instructions
+
+1. Ensure you have [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/) installed.
+2. From the root of the project, run the following command:
 
 ```bash
 docker-compose up --build
 ```
 
-Esto iniciará:
+This will start:
 
-- PostgreSQL en el puerto **5432**
-- RabbitMQ en el puerto **5672** (interfaz en [http://localhost:15672](http://localhost:15672))
-- Microservicios: **persona-service** y **cuenta-service**
+- PostgreSQL on port **5432**
+- RabbitMQ on port **5672** (management UI at [http://localhost:15672](http://localhost:15672))
+- Microservices: **person-service** and **account-service**
 
-### Credenciales RabbitMQ
+### RabbitMQ Credentials
 
 ```makefile
-Usuario: guest
-Contraseña: guest
+Username: guest  
+Password: guest
 ```
 
 ---
 
-## Colección Postman
+## Postman Collection
 
-Se incluye una colección para probar los endpoints de ambos microservicios:
+A collection is provided to test the endpoints of both microservices:
 
-- Archivo: `CHALLENGE-PRUEBA.postman_collection`
+- File: `CHALLENGE-PRUEBA.postman_collection`
 
-Importa esta colección en Postman y modifica las variables si es necesario para apuntar a los puertos locales.
+Import this collection into Postman and update environment variables if necessary to point to your local ports.
 
 ---
 
-## Ejecución de Tests
+## Test Execution
 
-Los servicios están cubiertos con pruebas unitarias e integración.
+Both services include unit and integration tests.
 
-Para ejecutarlos manualmente desde el proyecto:
+To run them manually from the project:
 
 ```bash
 ./mvnw clean test
 ```
 
-Asegúrate de tener RabbitMQ y PostgreSQL corriendo.
+Make sure RabbitMQ and PostgreSQL are running.
 
 ---
 
-## Tecnologías
+## Technologies
 
-- Java 17
-- Spring Boot 3.4.0
-- Spring Data JPA
-- Spring AMQP (RabbitMQ)
-- PostgreSQL
-- Docker & Docker Compose
+- Java 17  
+- Spring Boot 3.4.0  
+- Spring Data JPA  
+- Spring AMQP (RabbitMQ)  
+- PostgreSQL  
+- Docker & Docker Compose  
 - Lombok, ModelMapper, JUnit 5
 
 ---
 
-## Repositorio
+## Repository
 
-Puedes encontrar todo el código fuente y documentación adicional en:
+You can find the complete source code and additional documentation at:
 
 🔗 [https://github.com/cdquinterop/challenge-microservicios](https://github.com/cdquinterop/challenge-microservicios)
