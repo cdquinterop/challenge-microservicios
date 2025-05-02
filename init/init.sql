@@ -1,11 +1,12 @@
--- Crear la base de datos
-CREATE DATABASE banco_service_db;
+-- Create the database
+CREATE DATABASE bank_service_db;
 
--- Cambiar a esa base para crear los schemas
-\connect banco_service_db;
+-- Connect to the database
+\connect bank_service_db;
 
--- Schema del microservicio de persona
-CREATE SCHEMA IF NOT EXISTS cliente;
+-- Schema for the person microservice
+CREATE SCHEMA IF NOT EXISTS customer;
 
--- Schema del microservicio de cuenta
-CREATE SCHEMA IF NOT EXISTS cuenta_movimiento;
+-- Schema for the account microservice
+CREATE SCHEMA IF NOT EXISTS account_transaction;
+
