@@ -54,7 +54,7 @@ Password: guest
 
 A collection is provided to test the endpoints of both microservices:
 
-- File: `CHALLENGE-PRUEBA.postman_collection`
+- File: `Banking Microservices API.postman_collection`
 
 Import this collection into Postman and update environment variables if necessary to point to your local ports.
 
